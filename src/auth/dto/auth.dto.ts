@@ -43,23 +43,27 @@ export class LoginDto {
   password: string;
 }
 
-export class VerifyLoginOtpDto {
-  @ApiProperty()
+export class PhoneLoginRequestDto {
+  @ApiProperty({ example: '+5511987654321' })
   @IsString()
-  @IsNotEmpty()
-  login_challenge_token: string;
+  @Matches(PHONE_PATTERN, {
+    message: 'Telefone inválido. Use o formato internacional, ex: +5511987654321',
+  })
+  phone: string;
+}
+
+export class PhoneLoginVerifyDto {
+  @ApiProperty({ example: '+5511987654321' })
+  @IsString()
+  @Matches(PHONE_PATTERN, {
+    message: 'Telefone inválido. Use o formato internacional, ex: +5511987654321',
+  })
+  phone: string;
 
   @ApiProperty({ example: '123456' })
   @IsString()
   @Matches(/^\d{6}$/, { message: 'Código deve ter 6 dígitos' })
   code: string;
-}
-
-export class ResendLoginOtpDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  login_challenge_token: string;
 }
 
 export class RecoverPasswordRequestDto {

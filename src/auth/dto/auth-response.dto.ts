@@ -42,6 +42,16 @@ export class LoginChallengeResponseDto {
   message: string;
 }
 
+export class PhoneLoginRequestResponseDto {
+  @ApiProperty({ example: '****4321' })
+  phone_mask: string;
+
+  @ApiProperty({
+    example: 'Se o telefone estiver cadastrado, enviamos um código por SMS.',
+  })
+  message: string;
+}
+
 export class RecoverPasswordRequestResponseDto {
   @ApiProperty({ example: '****4321' })
   phone_mask: string;

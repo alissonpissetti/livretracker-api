@@ -11,15 +11,15 @@ import { AuthUser } from './auth-user.interface';
 import { AuthService } from './auth.service';
 import {
   LoginDto,
+  PhoneLoginRequestDto,
+  PhoneLoginVerifyDto,
   RecoverPasswordRequestDto,
   RecoverPasswordResetDto,
   RegisterDto,
-  ResendLoginOtpDto,
-  VerifyLoginOtpDto,
 } from './dto/auth.dto';
 import {
   AuthResponseDto,
-  LoginChallengeResponseDto,
+  PhoneLoginRequestResponseDto,
   RecoverPasswordRequestResponseDto,
   UserResponseDto,
 } from './dto/auth-response.dto';
@@ -38,33 +38,31 @@ export class AuthController {
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Entrar na conta (etapa 1 — e-mail e senha)' })
-  @ApiOkResponse({
-    description:
-      'Retorna token de acesso direto (admin) ou desafio 2FA por SMS (clientes)',
-    schema: {
-      oneOf: [
-        { $ref: '#/components/schemas/AuthResponseDto' },
-        { $ref: '#/components/schemas/LoginChallengeResponseDto' },
-      ],
-    },
-  })
+  @ApiOperation({ summary: 'Entrar com e-mail e senha' })
+  @ApiOkResponse({ type: AuthResponseDto })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto.email, dto.password);
   }
 
-  @Post('login/verify-otp')
-  @ApiOperation({ summary: 'Confirmar login com código SMS (etapa 2)' })
-  @ApiOkResponse({ type: AuthResponseDto })
-  verifyLoginOtp(@Body() dto: VerifyLoginOtpDto) {
-    return this.authService.verifyLoginOtp(dto);
+  @Post('login/phone')
+  @ApiOperation({ summary: 'Solicitar código SMS para login por telefone' })
+  @ApiOkResponse({ type: PhoneLoginRequestResponseDto })
+  requestPhoneLogin(@Body() dto: PhoneLoginRequestDto) {
+    return this.authService.requestPhoneLogin(dto);
   }
 
-  @Post('login/resend-otp')
-  @ApiOperation({ summary: 'Reenviar código SMS do login' })
-  @ApiOkResponse({ type: LoginChallengeResponseDto })
-  resendLoginOtp(@Body() dto: ResendLoginOtpDto) {
-    return this.authService.resendLoginOtp(dto);
+  @Post('login/phone/verify')
+  @ApiOperation({ summary: 'Confirmar login por telefone com código SMS' })
+  @ApiOkResponse({ type: AuthResponseDto })
+  verifyPhoneLogin(@Body() dto: PhoneLoginVerifyDto) {
+    return this.authService.verifyPhoneLogin(dto);
+  }
+
+  @Post('login/phone/resend')
+  @ApiOperation({ summary: 'Reenviar código SMS do login por telefone' })
+  @ApiOkResponse({ type: PhoneLoginRequestResponseDto })
+  resendPhoneLogin(@Body() dto: PhoneLoginRequestDto) {
+    return this.authService.resendPhoneLogin(dto);
   }
 
   @Post('recover/request')
