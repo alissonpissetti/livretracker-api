@@ -64,6 +64,9 @@ export class LocationRecordDto {
   @ApiPropertyOptional({ example: 'm2m.vivo.com.br' })
   apn?: string;
 
+  @ApiPropertyOptional({ example: 'lbs', enum: ['lbs', 'gps'] })
+  location_source?: string;
+
   @ApiProperty({ example: '2026-06-15T18:30:00Z' })
   recorded_at: string;
 
@@ -80,7 +83,8 @@ export class LatestLocationsResponseDto {
 
   @ApiProperty({
     type: [LocationRecordDto],
-    description: 'Até 20 posições, da mais recente para a mais antiga.',
+    description:
+      'Posições do equipamento (padrão: 20; use limit/from/to para histórico maior).',
     example: latestLocationsExample.locations,
   })
   locations: LocationRecordDto[];

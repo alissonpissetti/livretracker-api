@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { Location } from '../locations/entities/location.entity';
+import { databaseEntities } from './entities';
 
 export interface DbConnectionInfo {
   host: string;
@@ -22,10 +22,10 @@ function parseDatabaseUrl(url: string) {
   };
 }
 
-export function resolveDbConnectionInfo(
-  config: ConfigService,
+export function resolveDbConnectionFromProcessEnv(
+  env: NodeJS.ProcessEnv = process.env,
 ): DbConnectionInfo & { password: string } {
-  const databaseUrl = config.get<string>('DATABASE_URL', '').trim();
+  const databaseUrl = (env.DATABASE_URL ?? '').trim();
 
   if (databaseUrl) {
     const parsed = parseDatabaseUrl(databaseUrl);
@@ -33,12 +33,37 @@ export function resolveDbConnectionInfo(
   }
 
   return {
-    host: config.get<string>('DB_HOST', 'localhost'),
-    port: Number(config.get<string>('DB_PORT', '3306')),
-    username: config.get<string>('DB_USER', 'root'),
-    password: config.get<string>('DB_PASSWORD', ''),
-    database: config.get<string>('DB_NAME', 'default'),
+    host: env.DB_HOST ?? 'localhost',
+    port: Number(env.DB_PORT ?? '3306'),
+    username: env.DB_USER ?? 'root',
+    password: env.DB_PASSWORD ?? '',
+    database: env.DB_NAME ?? 'default',
     source: 'DB_*',
+  };
+}
+
+export function resolveDbConnectionInfo(
+  config: ConfigService,
+): DbConnectionInfo & { password: string } {
+  return resolveDbConnectionFromProcessEnv({
+    DATABASE_URL: config.get<string>('DATABASE_URL', '').trim(),
+    DB_HOST: config.get<string>('DB_HOST', 'localhost'),
+    DB_PORT: config.get<string>('DB_PORT', '3306'),
+    DB_USER: config.get<string>('DB_USER', 'root'),
+    DB_PASSWORD: config.get<string>('DB_PASSWORD', ''),
+    DB_NAME: config.get<string>('DB_NAME', 'default'),
+  });
+}
+
+function migrationPaths(): string[] {
+  return [__dirname + '/migrations/*{.ts,.js}'];
+}
+
+function readDbFlags(config: ConfigService) {
+  return {
+    synchronize: config.get<string>('DB_SYNCHRONIZE', 'false') === 'true',
+    migrationsRun: config.get<string>('DB_MIGRATE', 'true') === 'true',
+    logging: config.get<string>('DB_LOGGING', 'false') === 'true',
   };
 }
 
@@ -62,6 +87,11 @@ export function logDbConnectionTarget(config: ConfigService): void {
 
 function buildMariaDbConfig(config: ConfigService): TypeOrmModuleOptions {
   const info = resolveDbConnectionInfo(config);
+  const flags = readDbFlags(config);
+
+  console.log(
+    `[DB] Modo: synchronize=${flags.synchronize}, migrationsRun=${flags.migrationsRun}`,
+  );
 
   return {
     type: 'mariadb',
@@ -70,18 +100,29 @@ function buildMariaDbConfig(config: ConfigService): TypeOrmModuleOptions {
     username: info.username,
     password: info.password,
     database: info.database,
-    entities: [Location],
-    synchronize: config.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
+    entities: [...databaseEntities],
+    migrations: migrationPaths(),
+    synchronize: flags.synchronize,
+    migrationsRun: flags.migrationsRun,
+    logging: flags.logging,
     connectTimeout: 30000,
   };
 }
 
-function buildSqliteConfig(database: string): TypeOrmModuleOptions {
+function buildSqliteConfig(
+  config: ConfigService,
+  database: string,
+): TypeOrmModuleOptions {
+  const flags = readDbFlags(config);
+
   return {
     type: 'sqlite',
     database,
-    entities: [Location],
-    synchronize: true,
+    entities: [...databaseEntities],
+    migrations: migrationPaths(),
+    synchronize: flags.synchronize,
+    migrationsRun: flags.migrationsRun,
+    logging: flags.logging,
   };
 }
 
@@ -92,6 +133,7 @@ export function createTypeOrmConfig(
 
   if (driver === 'sqlite') {
     return buildSqliteConfig(
+      config,
       config.get<string>('DATABASE_PATH', ':memory:'),
     );
   }

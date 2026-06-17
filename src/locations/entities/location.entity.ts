@@ -51,6 +51,12 @@ export class Location {
   @Column({ length: 128, nullable: true })
   apn?: string;
 
+  @Column({ length: 8, nullable: true })
+  location_source?: string;
+
+  @Column('int', { nullable: true })
+  battery_percent?: number;
+
   @Column({ length: 32 })
   recorded_at: string;
 

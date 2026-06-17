@@ -1,9 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AccountModule } from './account/account.module';
+import { AdminModule } from './admin/admin.module';
+import { AuthModule } from './auth/auth.module';
 import { createTypeOrmConfig } from './database/typeorm.config';
+import { DevicesModule } from './devices/devices.module';
 import { HealthController } from './health/health.controller';
 import { LocationsModule } from './locations/locations.module';
+import { StoreModule } from './store/store.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -12,7 +19,14 @@ import { LocationsModule } from './locations/locations.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => createTypeOrmConfig(config),
     }),
+    UsersModule,
+    AuthModule,
+    AccountModule,
+    AdminModule,
     LocationsModule,
+    DevicesModule,
+    StoreModule,
+    SubscriptionsModule,
   ],
   controllers: [HealthController],
 })

@@ -1,0 +1,185 @@
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthUser } from '../auth/auth-user.interface';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { LatestLocationsQueryDto } from '../locations/dto/latest-locations-query.dto';
+import { LocationsService } from '../locations/locations.service';
+import { Location } from '../locations/entities/location.entity';
+import { StoreService } from '../store/store.service';
+import { Subscription } from '../subscriptions/entities/subscription.entity';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { DeviceIcon } from '../subscriptions/device-icon';
+import { ActivateDeviceDto, UpdateDeviceDto } from './dto/account.dto';
+import {
+  AccountDeviceDto,
+  AccountDevicesResponseDto,
+  AccountOrdersResponseDto,
+} from './dto/account-response.dto';
+import { AccountDeviceLocationsResponseDto } from './dto/account-locations-response.dto';
+
+function toDeviceDto(subscription: Subscription, service: SubscriptionsService): AccountDeviceDto {
+  const isActive = service.isActive(subscription);
+  return {
+    id: subscription.id,
+    label: subscription.label,
+    icon: subscription.icon ?? 'vehicle',
+    device_id: subscription.device_id,
+    status: subscription.status,
+    current_period_end: subscription.current_period_end.toISOString(),
+    is_active: isActive,
+    awaiting_activation: !subscription.device_id,
+    order_id: subscription.order_id,
+  };
+}
+
+function toLocationDto(location: Location) {
+  return {
+    id: location.id,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    speed_knots: location.speed_knots,
+    accuracy_m: location.accuracy_m,
+    battery_percent: location.battery_percent,
+    location_source: location.location_source,
+    recorded_at: location.recorded_at,
+    received_at: location.received_at.toISOString(),
+  };
+}
+
+@ApiTags('account')
+@Controller('v1/account')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('bearer')
+export class AccountController {
+  constructor(
+    private readonly storeService: StoreService,
+    private readonly subscriptionsService: SubscriptionsService,
+    private readonly locationsService: LocationsService,
+  ) {}
+
+  @Get('orders')
+  @ApiOperation({ summary: 'Meus pedidos' })
+  @ApiOkResponse({ type: AccountOrdersResponseDto })
+  async orders(@CurrentUser() user: AuthUser) {
+    const orders = await this.storeService.listOrdersForUser(user.id);
+    return { orders };
+  }
+
+  @Get('devices')
+  @ApiOperation({
+    summary: 'Meus equipamentos',
+    description:
+      'Lista slots de rastreadores comprados. Ative o IMEI quando receber cada unidade.',
+  })
+  @ApiOkResponse({ type: AccountDevicesResponseDto })
+  async devices(@CurrentUser() user: AuthUser) {
+    const subscriptions = await this.subscriptionsService.findByUserId(user.id);
+    return {
+      devices: subscriptions.map((item) =>
+        toDeviceDto(item, this.subscriptionsService),
+      ),
+    };
+  }
+
+  @Patch('devices/:id/activate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ativar IMEI do equipamento recebido' })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: AccountDeviceDto })
+  async activateDevice(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ActivateDeviceDto,
+  ) {
+    const subscription = await this.subscriptionsService.activateDevice(
+      id,
+      dto.device_id,
+      user.id,
+    );
+    return toDeviceDto(subscription, this.subscriptionsService);
+  }
+
+  @Patch('devices/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Personalizar nome e ícone do rastreador' })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: AccountDeviceDto })
+  async updateDevice(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateDeviceDto,
+  ) {
+    const subscription = await this.subscriptionsService.updateDeviceProfile(
+      id,
+      user.id,
+      {
+        label: dto.label,
+        icon: dto.icon as DeviceIcon | undefined,
+      },
+    );
+    return toDeviceDto(subscription, this.subscriptionsService);
+  }
+
+  @Get('devices/:id/locations')
+  @ApiOperation({ summary: 'Histórico de rastreios do equipamento (ordenado por tempo)' })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: AccountDeviceLocationsResponseDto })
+  async deviceLocations(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query() query: LatestLocationsQueryDto,
+  ) {
+    const subscription = await this.subscriptionsService.findByIdForUser(
+      id,
+      user.id,
+    );
+
+    if (!subscription.device_id) {
+      throw new BadRequestException(
+        'Ative o IMEI do equipamento para visualizar os rastreios',
+      );
+    }
+
+    const locations = await this.locationsService.findRouteByDevice(
+      subscription.device_id,
+      {
+        limit: query.limit ?? 500,
+        from: query.from,
+        to: query.to,
+      },
+    );
+
+    return {
+      device: toDeviceDto(subscription, this.subscriptionsService),
+      locations: locations.map(toLocationDto),
+    };
+  }
+
+  @Patch('devices/:id/renew')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Renovar assinatura do equipamento (+30 dias)' })
+  @ApiParam({ name: 'id' })
+  @ApiOkResponse({ type: AccountDeviceDto })
+  async renewDevice(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    const subscription = await this.subscriptionsService.renew(id, user.id, 30);
+    return toDeviceDto(subscription, this.subscriptionsService);
+  }
+}

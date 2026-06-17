@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OpenAPIObject } from '@nestjs/swagger';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
@@ -13,8 +14,13 @@ O firmware envia posições periodicamente; esta API armazena e permite consulta
 
 | Etapa | Quem | Ação |
 | --- | --- | --- |
-| 1 | Rastreador | \`POST /v1/locations\` — envia uma posição |
-| 2 | Painel / integração | \`GET /v1/locations/devices/{deviceId}/latest\` — lê as últimas 20 posições |
+| 1 | Rastreador | \`POST /v1/locations\` — envia uma posição (por \`device_id\`) |
+| 2 | Painel / integração | \`GET /v1/locations/devices/{deviceId}/latest\` — histórico recente |
+| 3 | Administração | \`PATCH /v1/admin/devices/{deviceId}/block\` — bloqueia IMEI |
+| 4 | Cliente logado | \`POST /v1/auth/register\` e \`POST /v1/auth/login\` |
+| 5 | Loja | \`POST /v1/store/checkout\` — cria pedido e slots (aceita \`voucher_code\`) |
+| 6 | Conta | \`GET /v1/account/orders\` e \`PATCH /v1/account/devices/:id/activate\` |
+| 7 | Admin | \`GET /v1/admin/users\`, vouchers, equipamentos (role admin) |
 
 ## Autenticação
 
@@ -42,6 +48,26 @@ function patchOpenApiDocument(document: OpenAPIObject): OpenAPIObject {
       'x-displayName': 'Localizações',
     } as (typeof document.tags)[number],
     {
+      name: 'auth',
+      description: 'Cadastro e login de clientes.',
+      'x-displayName': 'Conta',
+    } as (typeof document.tags)[number],
+    {
+      name: 'store',
+      description: 'Catálogo e checkout autenticado.',
+      'x-displayName': 'Loja',
+    } as (typeof document.tags)[number],
+    {
+      name: 'account',
+      description: 'Pedidos, equipamentos e ativação de IMEI.',
+      'x-displayName': 'Minha conta',
+    } as (typeof document.tags)[number],
+    {
+      name: 'admin',
+      description: 'Gestão interna — contas, equipamentos e pedidos.',
+      'x-displayName': 'Administração',
+    } as (typeof document.tags)[number],
+    {
       name: 'health',
       description: 'Verificação de disponibilidade da API.',
       'x-displayName': 'Saúde',
@@ -51,7 +77,11 @@ function patchOpenApiDocument(document: OpenAPIObject): OpenAPIObject {
   document['x-tagGroups'] = [
     {
       name: 'Rastreamento',
-      tags: ['locations'],
+      tags: ['locations', 'auth', 'store', 'account'],
+    },
+    {
+      name: 'Administração',
+      tags: ['admin'],
     },
     {
       name: 'Infraestrutura',
@@ -63,8 +93,16 @@ function patchOpenApiDocument(document: OpenAPIObject): OpenAPIObject {
 }
 
 export function setupSwagger(app: INestApplication): void {
-  const config = new DocumentBuilder()
-    .setTitle('LiveTracker API')
+  const config = app.get(ConfigService);
+  const enabled =
+    config.get<string>('API_DOCS_ENABLED', 'false').toLowerCase() === 'true';
+
+  if (!enabled) {
+    return;
+  }
+
+  const builder = new DocumentBuilder()
+    .setTitle('LIVRE TRACKER API')
     .setDescription(API_DESCRIPTION)
     .setVersion('1.0')
     .addBearerAuth(
@@ -78,11 +116,15 @@ export function setupSwagger(app: INestApplication): void {
       'bearer',
     )
     .addTag('locations', 'Registro e consulta de posições GPS')
+    .addTag('auth', 'Cadastro e login')
+    .addTag('store', 'Loja e checkout')
+    .addTag('account', 'Pedidos e equipamentos do cliente')
+    .addTag('admin', 'Gestão interna LIVRE TRACKER')
     .addTag('health', 'Verificação de disponibilidade')
     .build();
 
   const document = patchOpenApiDocument(
-    SwaggerModule.createDocument(app, config),
+    SwaggerModule.createDocument(app, builder),
   );
 
   SwaggerModule.setup('openapi', app, document, {
@@ -102,7 +144,7 @@ export function setupSwagger(app: INestApplication): void {
       operationTitleSource: 'summary',
       searchHotKey: 'k',
       metaData: {
-        title: 'LiveTracker API',
+        title: 'LIVRE TRACKER API',
         description: 'Documentação interativa — rastreamento GPS',
       },
       authentication: {

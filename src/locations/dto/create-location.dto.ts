@@ -48,6 +48,15 @@ export class CreateLocationDto {
   recorded_at: string;
 
   @ApiPropertyOptional({
+    description: 'Origem da posição: `lbs` (torres celulares) ou `gps` (satélite).',
+    example: 'lbs',
+    enum: ['lbs', 'gps'],
+  })
+  @IsOptional()
+  @IsString()
+  location_source?: string;
+
+  @ApiPropertyOptional({
     description: 'Altitude em metros acima do nível do mar.',
     example: 760.5,
   })
@@ -118,6 +127,18 @@ export class CreateLocationDto {
   @IsOptional()
   @IsString()
   operator?: string;
+
+  @ApiPropertyOptional({
+    description: 'Nível de bateria do equipamento em percentual (0–100).',
+    example: 87,
+    minimum: 0,
+    maximum: 100,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  battery_percent?: number;
 
   @ApiPropertyOptional({
     description: 'APN usado na conexão de dados.',

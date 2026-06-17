@@ -6,11 +6,13 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -23,6 +25,7 @@ import {
   latestLocationsExample,
 } from '../swagger/location.examples';
 import { CreateLocationDto } from './dto/create-location.dto';
+import { LatestLocationsQueryDto } from './dto/latest-locations-query.dto';
 import {
   CreateLocationResponseDto,
   LatestLocationsResponseDto,
@@ -68,6 +71,9 @@ Registra uma nova posição enviada pelo rastreador.
     type: CreateLocationResponseDto,
     description: 'Posição armazenada com sucesso',
   })
+  @ApiForbiddenResponse({
+    description: 'Equipamento bloqueado — envio rejeitado',
+  })
   async create(@Body() dto: CreateLocationDto) {
     const location = await this.locationsService.create(dto);
 
@@ -82,7 +88,9 @@ Registra uma nova posição enviada pelo rastreador.
   @ApiOperation({
     summary: 'Consultar últimas posições',
     description: `
-Retorna as **20 posições mais recentes** de um equipamento, ordenadas da mais nova para a mais antiga.
+Retorna posições de um equipamento, ordenadas da mais nova para a mais antiga.
+
+Use \`limit\` (máx. 500) e os filtros \`from\`/\`to\` para montar histórico e rotas por dia.
 
 \`deviceId\` é normalmente o **IMEI** do rastreador (mesmo valor de \`device_id\` no envio).
     `.trim(),
@@ -97,8 +105,15 @@ Retorna as **20 posições mais recentes** de um equipamento, ordenadas da mais 
     description: 'Lista das últimas posições registradas',
     schema: { example: latestLocationsExample },
   })
-  async latest(@Param('deviceId') deviceId: string) {
-    const locations = await this.locationsService.findLatestByDevice(deviceId);
+  async latest(
+    @Param('deviceId') deviceId: string,
+    @Query() query: LatestLocationsQueryDto,
+  ) {
+    const locations = await this.locationsService.findLatestByDevice(deviceId, {
+      limit: query.limit,
+      from: query.from,
+      to: query.to,
+    });
     return { device_id: deviceId, locations };
   }
 }
