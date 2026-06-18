@@ -62,6 +62,15 @@ export class GeolocationService {
 
     if (!response.ok) {
       const detail = await response.text();
+
+      if (response.status === 403 && detail.includes('API_KEY_HTTP_REFERRER_BLOCKED')) {
+        throw new ServiceUnavailableException(
+          'Chave Google incorreta para o servidor: use GOOGLE_GEOLOCATION_API_KEY com restrição ' +
+            'por IP (não use a chave do Maps com restrição de referrer HTTP). ' +
+            'Veja api/.env.example — seção Google Geolocation.',
+        );
+      }
+
       throw new BadGatewayException(
         `Google Geolocation API respondeu ${response.status}: ${detail}`,
       );
