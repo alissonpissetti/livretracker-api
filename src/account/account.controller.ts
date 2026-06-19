@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
   BadRequestException,
@@ -34,6 +36,12 @@ import {
   AccountOrdersResponseDto,
 } from './dto/account-response.dto';
 import { AccountDeviceLocationsResponseDto } from './dto/account-locations-response.dto';
+import {
+  CreateTrackingShareDto,
+  TrackingShareDto,
+  TrackingShareListResponseDto,
+} from '../tracking-shares/dto/tracking-share.dto';
+import { TrackingSharesService } from '../tracking-shares/tracking-shares.service';
 
 function toDeviceDto(subscription: Subscription, service: SubscriptionsService): AccountDeviceDto {
   const isActive = service.isActive(subscription);
@@ -59,6 +67,7 @@ function toLocationDto(location: Location) {
     accuracy_m: location.accuracy_m,
     battery_percent: location.battery_percent,
     location_source: location.location_source,
+    is_valid: location.is_valid,
     recorded_at: location.recorded_at,
     received_at: location.received_at.toISOString(),
   };
@@ -73,6 +82,7 @@ export class AccountController {
     private readonly storeService: StoreService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly locationsService: LocationsService,
+    private readonly trackingSharesService: TrackingSharesService,
   ) {}
 
   @Get('orders')
@@ -181,5 +191,50 @@ export class AccountController {
   async renewDevice(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const subscription = await this.subscriptionsService.renew(id, user.id, 30);
     return toDeviceDto(subscription, this.subscriptionsService);
+  }
+
+  @Post('devices/:id/share-links')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Gerar link público de rastreio ao vivo' })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: TrackingShareDto })
+  async createShareLink(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: CreateTrackingShareDto,
+  ) {
+    return this.trackingSharesService.createShare(user.id, id, dto);
+  }
+
+  @Get('devices/:id/share-links')
+  @ApiOperation({ summary: 'Listar links de compartilhamento do equipamento' })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: TrackingShareListResponseDto })
+  async listShareLinks(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.trackingSharesService.listShares(user.id, id);
+  }
+
+  @Delete('devices/:id/share-links/:shareId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Encerrar link de compartilhamento' })
+  @ApiOkResponse({ type: TrackingShareDto })
+  async revokeShareLink(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('shareId') shareId: string,
+  ) {
+    return this.trackingSharesService.revokeShare(user.id, id, shareId);
+  }
+
+  @Post('devices/:id/share-links/:shareId/dismiss')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remover link encerrado da lista (soft delete)' })
+  async dismissShareLink(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('shareId') shareId: string,
+  ) {
+    await this.trackingSharesService.dismissShare(user.id, id, shareId);
+    return { ok: true };
   }
 }

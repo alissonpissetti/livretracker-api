@@ -11,6 +11,7 @@ import { HealthController } from './health/health.controller';
 import { LocationsModule } from './locations/locations.module';
 import { StoreModule } from './store/store.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { TrackingSharesModule } from './tracking-shares/tracking-shares.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module';
     DevicesModule,
     StoreModule,
     SubscriptionsModule,
+    TrackingSharesModule,
   ],
   controllers: [HealthController],
 })

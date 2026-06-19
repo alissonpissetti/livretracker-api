@@ -57,6 +57,9 @@ export class Location {
   @Column('int', { nullable: true })
   battery_percent?: number;
 
+  @Column({ default: true })
+  is_valid: boolean;
+
   @Column({ length: 32 })
   recorded_at: string;
 

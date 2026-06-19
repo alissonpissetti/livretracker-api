@@ -5,6 +5,7 @@ import { OrderItem } from '../store/entities/order-item.entity';
 import { Order } from '../store/entities/order.entity';
 import { Product } from '../store/entities/product.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
+import { TrackingShare } from '../tracking-shares/entities/tracking-share.entity';
 import { User } from '../users/entities/user.entity';
 import { Voucher } from '../vouchers/entities/voucher.entity';
 
@@ -19,4 +20,5 @@ export const databaseEntities = [
   Order,
   OrderItem,
   Subscription,
+  TrackingShare,
 ] as const;
