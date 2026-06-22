@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, MoreThan, Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { LocationsService } from '../locations/locations.service';
+import { DevicesService } from '../devices/devices.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateTrackingShareDto } from './dto/tracking-share.dto';
 import { TrackingShare } from './entities/tracking-share.entity';
@@ -30,6 +31,7 @@ export class TrackingSharesService {
     private readonly sharesRepository: Repository<TrackingShare>,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly locationsService: LocationsService,
+    private readonly devicesService: DevicesService,
     private readonly config: ConfigService,
   ) {}
 
@@ -206,17 +208,27 @@ export class TrackingSharesService {
         new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime(),
     );
 
+    const hardware = await this.devicesService.findHardwareForSubscription(
+      share.device_id,
+    );
+
     return {
       recipient_name: share.recipient_name,
       device_label: share.subscription?.label ?? 'Rastreador',
       device_icon: share.subscription?.icon ?? 'vehicle',
       expires_at: share.expires_at?.toISOString() ?? null,
+      last_battery_percent: hardware?.last_battery_percent ?? null,
+      last_usb_connected: hardware?.last_usb_connected ?? null,
+      last_battery_charging: hardware?.last_battery_charging ?? null,
+      last_power_at: hardware?.last_power_at?.toISOString() ?? null,
       locations: ordered.map((location) => ({
         id: location.id,
         latitude: location.latitude,
         longitude: location.longitude,
         speed_knots: location.speed_knots,
         battery_percent: location.battery_percent,
+        usb_connected: location.usb_connected ?? undefined,
+        battery_charging: location.battery_charging ?? undefined,
         location_source: location.location_source,
         is_valid: location.is_valid,
         recorded_at: location.recorded_at,

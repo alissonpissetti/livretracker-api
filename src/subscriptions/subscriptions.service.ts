@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthUser } from '../auth/auth-user.interface';
 import { DevicesService } from '../devices/devices.service';
+import { UsersService } from '../users/users.service';
 import { DEFAULT_DEVICE_ICON, DeviceIcon } from './device-icon';
 import { Subscription } from './entities/subscription.entity';
 
@@ -17,6 +18,7 @@ export class SubscriptionsService {
     @InjectRepository(Subscription)
     private readonly subscriptionsRepository: Repository<Subscription>,
     private readonly devicesService: DevicesService,
+    private readonly usersService: UsersService,
   ) {}
 
   isActive(subscription: Subscription): boolean {
@@ -171,6 +173,40 @@ export class SubscriptionsService {
 
     if (input.icon !== undefined) {
       subscription.icon = input.icon;
+    }
+
+    return this.subscriptionsRepository.save(subscription);
+  }
+
+  async updateDeviceAlerts(
+    subscriptionId: string,
+    userId: string,
+    input: {
+      alert_battery_low_enabled?: boolean;
+      alert_battery_full_enabled?: boolean;
+    },
+  ): Promise<Subscription> {
+    const subscription = await this.findByIdForUser(subscriptionId, userId);
+
+    const enabling =
+      input.alert_battery_low_enabled === true ||
+      input.alert_battery_full_enabled === true;
+
+    if (enabling) {
+      const user = await this.usersService.findById(userId);
+      if (!user.phone) {
+        throw new BadRequestException(
+          'Cadastre um celular em Meus dados antes de ativar alertas por SMS.',
+        );
+      }
+    }
+
+    if (input.alert_battery_low_enabled !== undefined) {
+      subscription.alert_battery_low_enabled = input.alert_battery_low_enabled;
+    }
+
+    if (input.alert_battery_full_enabled !== undefined) {
+      subscription.alert_battery_full_enabled = input.alert_battery_full_enabled;
     }
 
     return this.subscriptionsRepository.save(subscription);

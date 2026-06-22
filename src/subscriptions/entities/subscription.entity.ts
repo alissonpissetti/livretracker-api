@@ -67,6 +67,12 @@ export class Subscription {
   @Column({ length: 16, default: 'vehicle' })
   icon: DeviceIcon;
 
+  @Column({ default: false })
+  alert_battery_low_enabled: boolean;
+
+  @Column({ default: false })
+  alert_battery_full_enabled: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 

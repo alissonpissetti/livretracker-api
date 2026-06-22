@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { DevicesService } from '../devices/devices.service';
+import { DeviceAlertsService } from '../device-alerts/device-alerts.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { Location } from './entities/location.entity';
@@ -22,6 +23,7 @@ export class LocationsService {
     private readonly locationsRepository: Repository<Location>,
     private readonly devicesService: DevicesService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly deviceAlertsService: DeviceAlertsService,
   ) {}
 
   async create(dto: CreateLocationDto): Promise<Location> {
@@ -64,6 +66,27 @@ export class LocationsService {
 
     if (is_valid) {
       await this.devicesService.touchFromLocation(device, dto);
+    }
+
+    if (dto.battery_percent != null) {
+      await this.deviceAlertsService.processBatteryReading(
+        device,
+        dto.battery_percent,
+      );
+    }
+
+    if (
+      dto.battery_percent != null ||
+      dto.usb_connected != null ||
+      dto.battery_charging != null
+    ) {
+      await this.devicesService.updatePowerFromReading(device, dto);
+    } else if (dto.battery_percent != null) {
+      await this.devicesService.saveBatteryAlertState(device);
+    }
+
+    if (dto.sim_msisdn) {
+      await this.devicesService.updateSimMsisdn(device, dto.sim_msisdn);
     }
 
     return saved;

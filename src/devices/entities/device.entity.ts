@@ -45,4 +45,28 @@ export class Device {
 
   @Column({ type: 'datetime', nullable: true })
   emergency_activated_at?: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  last_battery_percent?: number | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  last_usb_connected?: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  last_battery_charging?: boolean | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  last_power_at?: Date | null;
+
+  @Column({ default: false })
+  battery_low_alert_active: boolean;
+
+  @Column({ default: false })
+  battery_full_alert_active: boolean;
+
+  @Column({ length: 20, nullable: true })
+  sim_msisdn?: string | null;
+
+  @Column({ length: 8, nullable: true })
+  sms_command_pin?: string | null;
 }

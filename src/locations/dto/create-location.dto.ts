@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsISO8601,
   IsNotEmpty,
   IsNumber,
@@ -141,10 +142,34 @@ export class CreateLocationDto {
   battery_percent?: number;
 
   @ApiPropertyOptional({
+    description: 'USB-C do equipamento conectado (alimentação externa detectada).',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  usb_connected?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Bateria em carga no momento da leitura.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  battery_charging?: boolean;
+
+  @ApiPropertyOptional({
     description: 'APN usado na conexão de dados.',
     example: 'm2m.vivo.com.br',
   })
   @IsOptional()
   @IsString()
   apn?: string;
+
+  @ApiPropertyOptional({
+    description: 'Número de telefone do chip SIM no equipamento (MSISDN).',
+    example: '+5511999999999',
+  })
+  @IsOptional()
+  @IsString()
+  sim_msisdn?: string;
 }

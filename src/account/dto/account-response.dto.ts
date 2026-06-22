@@ -54,6 +54,36 @@ export class AccountDeviceDto {
 
   @ApiProperty()
   emergency_remaining_sec: number;
+
+  @ApiProperty()
+  alert_battery_low_enabled: boolean;
+
+  @ApiProperty()
+  alert_battery_full_enabled: boolean;
+
+  @ApiPropertyOptional({ description: 'Última leitura de bateria (%)' })
+  last_battery_percent?: number | null;
+
+  @ApiPropertyOptional({ description: 'USB-C conectado na última leitura' })
+  last_usb_connected?: boolean | null;
+
+  @ApiPropertyOptional({ description: 'Bateria em carga na última leitura' })
+  last_battery_charging?: boolean | null;
+
+  @ApiPropertyOptional({ description: 'Quando a telemetria de energia foi atualizada' })
+  last_power_at?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Número do chip no equipamento, quando conhecido',
+  })
+  sim_msisdn?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'PIN de 6 dígitos para validar SMS de comando no equipamento',
+    example: '482913',
+    nullable: true,
+  })
+  sms_command_pin?: string | null;
 }
 
 export class AccountDevicesResponseDto {

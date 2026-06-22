@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OptionalBearerGuard } from '../auth/optional-bearer.guard';
+import { DeviceAlertsModule } from '../device-alerts/device-alerts.module';
 import { DevicesModule } from '../devices/devices.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { Location } from './entities/location.entity';
@@ -12,6 +13,7 @@ import { LocationsService } from './locations.service';
     TypeOrmModule.forFeature([Location]),
     DevicesModule,
     SubscriptionsModule,
+    DeviceAlertsModule,
   ],
   controllers: [LocationsController],
   providers: [LocationsService, OptionalBearerGuard],

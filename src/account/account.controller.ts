@@ -29,7 +29,7 @@ import { StoreService } from '../store/store.service';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { DeviceIcon } from '../subscriptions/device-icon';
-import { ActivateDeviceDto, UpdateDeviceDto } from './dto/account.dto';
+import { ActivateDeviceDto, UpdateAccountProfileDto, UpdateDeviceAlertsDto, UpdateDeviceChipDto, UpdateDeviceDto } from './dto/account.dto';
 import {
   AccountDeviceDto,
   AccountDevicesResponseDto,
@@ -43,6 +43,9 @@ import {
 } from '../tracking-shares/dto/tracking-share.dto';
 import { TrackingSharesService } from '../tracking-shares/tracking-shares.service';
 import { DevicesService } from '../devices/devices.service';
+import { AuthService } from '../auth/auth.service';
+import { UsersService } from '../users/users.service';
+import { UserResponseDto } from '../auth/dto/auth-response.dto';
 
 async function toDeviceDto(
   subscription: Subscription,
@@ -51,7 +54,10 @@ async function toDeviceDto(
 ): Promise<AccountDeviceDto> {
   const isActive = subscriptionsService.isActive(subscription);
   const hardware = await devicesService.findHardwareForSubscription(subscription.device_id);
-  const emergency = devicesService.getEmergencyState(hardware);
+  const hardwareWithPin = hardware
+    ? await devicesService.ensureSmsCommandPin(hardware)
+    : null;
+  const emergency = devicesService.getEmergencyState(hardwareWithPin);
   const period = subscriptionsService.buildPeriodInfo(subscription);
 
   return {
@@ -71,6 +77,14 @@ async function toDeviceDto(
     emergency_until: emergency.emergency_until,
     emergency_active: emergency.emergency_active,
     emergency_remaining_sec: emergency.emergency_remaining_sec,
+    alert_battery_low_enabled: subscription.alert_battery_low_enabled,
+    alert_battery_full_enabled: subscription.alert_battery_full_enabled,
+    last_battery_percent: hardwareWithPin?.last_battery_percent ?? null,
+    last_usb_connected: hardwareWithPin?.last_usb_connected ?? null,
+    last_battery_charging: hardwareWithPin?.last_battery_charging ?? null,
+    last_power_at: hardwareWithPin?.last_power_at?.toISOString() ?? null,
+    sms_command_pin: hardwareWithPin?.sms_command_pin ?? null,
+    sim_msisdn: hardwareWithPin?.sim_msisdn ?? null,
   };
 }
 
@@ -82,6 +96,8 @@ function toLocationDto(location: Location) {
     speed_knots: location.speed_knots,
     accuracy_m: location.accuracy_m,
     battery_percent: location.battery_percent,
+    usb_connected: location.usb_connected ?? undefined,
+    battery_charging: location.battery_charging ?? undefined,
     location_source: location.location_source,
     is_valid: location.is_valid,
     recorded_at: location.recorded_at,
@@ -100,7 +116,39 @@ export class AccountController {
     private readonly locationsService: LocationsService,
     private readonly trackingSharesService: TrackingSharesService,
     private readonly devicesService: DevicesService,
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
   ) {}
+
+  @Get('profile')
+  @ApiOperation({ summary: 'Meus dados cadastrais' })
+  @ApiOkResponse({ type: UserResponseDto })
+  async profile(@CurrentUser() user: AuthUser) {
+    return this.authService.me(user.id);
+  }
+
+  @Patch('profile')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Atualizar meus dados',
+    description:
+      'Permite alterar nome e celular de alerta (também usado para login por SMS).',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  async updateProfile(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateAccountProfileDto,
+  ) {
+    if (dto.name === undefined && dto.phone === undefined) {
+      throw new BadRequestException('Informe ao menos um campo para atualizar');
+    }
+
+    await this.usersService.updateProfile(user.id, {
+      name: dto.name,
+      phone: dto.phone,
+    });
+    return this.authService.me(user.id);
+  }
 
   @Get('orders')
   @ApiOperation({ summary: 'Meus pedidos' })
@@ -126,6 +174,20 @@ export class AccountController {
         ),
       ),
     };
+  }
+
+  @Get('devices/:id')
+  @ApiOperation({
+    summary: 'Detalhes do equipamento na conta (telemetria de energia, emergência, etc.)',
+  })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: AccountDeviceDto })
+  async device(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    const subscription = await this.subscriptionsService.findByIdForUser(id, user.id);
+    return toDeviceDto(subscription, this.subscriptionsService, this.devicesService);
   }
 
   @Patch('devices/:id/activate')
@@ -164,6 +226,62 @@ export class AccountController {
         icon: dto.icon as DeviceIcon | undefined,
       },
     );
+    return toDeviceDto(subscription, this.subscriptionsService, this.devicesService);
+  }
+
+  @Patch('devices/:id/alerts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Configurar alertas por SMS do equipamento' })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: AccountDeviceDto })
+  async updateDeviceAlerts(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateDeviceAlertsDto,
+  ) {
+    if (
+      dto.alert_battery_low_enabled === undefined &&
+      dto.alert_battery_full_enabled === undefined
+    ) {
+      throw new BadRequestException('Informe ao menos um alerta para atualizar');
+    }
+
+    const subscription = await this.subscriptionsService.updateDeviceAlerts(
+      id,
+      user.id,
+      {
+        alert_battery_low_enabled: dto.alert_battery_low_enabled,
+        alert_battery_full_enabled: dto.alert_battery_full_enabled,
+      },
+    );
+    return toDeviceDto(subscription, this.subscriptionsService, this.devicesService);
+  }
+
+  @Patch('devices/:id/chip')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cadastrar número do chip para SMS de comando',
+    description:
+      'Informe o MSISDN do chip M2M quando o equipamento ainda não reportou via +CNUM.',
+  })
+  @ApiParam({ name: 'id', description: 'ID do slot/equipamento na conta' })
+  @ApiOkResponse({ type: AccountDeviceDto })
+  async updateDeviceChip(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateDeviceChipDto,
+  ) {
+    const subscription = await this.subscriptionsService.findByIdForUser(id, user.id);
+
+    if (!subscription.device_id) {
+      throw new BadRequestException(
+        'Ative o IMEI do equipamento antes de cadastrar o número do chip',
+      );
+    }
+
+    const device = await this.devicesService.ensureExists(subscription.device_id);
+    await this.devicesService.updateSimMsisdn(device, dto.sim_msisdn);
+
     return toDeviceDto(subscription, this.subscriptionsService, this.devicesService);
   }
 

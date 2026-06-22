@@ -91,6 +91,34 @@ export class UsersService implements OnModuleInit {
     return this.usersRepository.save(user);
   }
 
+  async updateProfile(
+    userId: string,
+    data: { name?: string; phone?: string | null },
+  ): Promise<User> {
+    const user = await this.findById(userId);
+
+    if (data.name !== undefined) {
+      user.name = data.name.trim();
+    }
+
+    if (data.phone !== undefined) {
+      if (data.phone === null || data.phone.trim() === '') {
+        user.phone = null;
+      } else {
+        const normalizedPhone = normalizePhone(data.phone);
+        const existingPhone = await this.usersRepository.findOne({
+          where: { phone: normalizedPhone },
+        });
+        if (existingPhone && existingPhone.id !== userId) {
+          throw new ConflictException('Telefone já cadastrado em outra conta');
+        }
+        user.phone = normalizedPhone;
+      }
+    }
+
+    return this.usersRepository.save(user);
+  }
+
   async findById(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) {

@@ -18,4 +18,11 @@ export class DeviceConfigDto {
 
   @ApiProperty({ example: 3 })
   stop_samples_required: number;
+
+  @ApiProperty({
+    description:
+      'PIN de 6 dígitos para validar SMS de comando recebidos pelo equipamento.',
+    example: '482913',
+  })
+  sms_command_pin: string;
 }

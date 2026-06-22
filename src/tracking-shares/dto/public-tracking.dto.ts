@@ -31,6 +31,12 @@ export class PublicTrackingLocationDto {
   @ApiPropertyOptional()
   battery_percent?: number;
 
+  @ApiPropertyOptional()
+  usb_connected?: boolean;
+
+  @ApiPropertyOptional()
+  battery_charging?: boolean;
+
   @ApiProperty()
   recorded_at: string;
 
@@ -53,4 +59,16 @@ export class PublicTrackingResponseDto {
 
   @ApiProperty({ type: [PublicTrackingLocationDto] })
   locations: PublicTrackingLocationDto[];
+
+  @ApiPropertyOptional({ description: 'Última leitura de bateria (%) no equipamento' })
+  last_battery_percent?: number | null;
+
+  @ApiPropertyOptional({ description: 'USB conectado na última leitura de energia' })
+  last_usb_connected?: boolean | null;
+
+  @ApiPropertyOptional({ description: 'Bateria em carga na última leitura de energia' })
+  last_battery_charging?: boolean | null;
+
+  @ApiPropertyOptional({ description: 'Quando a telemetria de energia foi atualizada no equipamento' })
+  last_power_at?: string | null;
 }

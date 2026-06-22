@@ -23,6 +23,12 @@ export class AccountDeviceLocationDto {
   @ApiPropertyOptional()
   battery_percent?: number;
 
+  @ApiPropertyOptional()
+  usb_connected?: boolean;
+
+  @ApiPropertyOptional()
+  battery_charging?: boolean;
+
   @ApiProperty({
     description: 'False quando a leitura foi descartada por inconsistência (salva apenas para auditoria).',
     example: true,
